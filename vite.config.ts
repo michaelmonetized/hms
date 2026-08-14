@@ -3,7 +3,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  fmt: {},
+  fmt: {
+    ignorePatterns: ["convex/_generated/**"],
+  },
   lint: {
     plugins: ["react", "typescript", "oxc"],
     rules: {
@@ -12,6 +14,7 @@ export default defineConfig({
         "warn",
         {
           allowConstantExport: true,
+          allowExportNames: ["useHMS", "useEditDoc", "useCollectionData", "useDebouncedBlocks"],
         },
       ],
       "vite-plus/prefer-vite-plus-imports": "error",

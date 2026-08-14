@@ -1,13 +1,7 @@
 import { useAuth } from "@clerk/react";
+import { hasClerk } from "@/lib/env";
 
-const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const hasClerk = Boolean(clerkKey && clerkKey.startsWith("pk_") && !clerkKey.includes("xxxxxxxx"));
-
-export function useHMSAuth() {
-  if (hasClerk) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useAuth();
-  }
+function useDevAuth() {
   return {
     isLoaded: true,
     isSignedIn: true,
@@ -16,3 +10,5 @@ export function useHMSAuth() {
     sessionId: "dev_session_1",
   };
 }
+
+export const useHMSAuth = hasClerk ? useAuth : useDevAuth;

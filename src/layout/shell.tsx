@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useLocation, Link } from "react-router-dom";
 import { RedirectToSignIn, UserButton } from "@clerk/react";
 import { useHMSAuth } from "@/hooks/use-hms-auth";
 import {
@@ -15,6 +15,12 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   LayoutPanelTopIcon,
   FileTextIcon,
   RssIcon,
@@ -26,6 +32,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { hasClerk } from "@/lib/env";
 
 const nav = [
   { to: "/", label: "Overview", icon: LayoutPanelTopIcon },
@@ -64,11 +71,6 @@ export default function Shell() {
 
 function AppShell() {
   const { pathname } = useLocation();
-  const hasClerkKey = Boolean(
-    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY &&
-    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY.startsWith("pk_") &&
-    !import.meta.env.VITE_CLERK_PUBLISHABLE_KEY.includes("xxxxxxxx"),
-  );
 
   return (
     <SidebarProvider>
@@ -117,7 +119,7 @@ function AppShell() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <div className="flex items-center gap-2 px-2 py-1.5">
-                {hasClerkKey ? (
+                {hasClerk ? (
                   <UserButton />
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -139,10 +141,22 @@ function AppShell() {
           <SidebarSeparator orientation="vertical" className="h-4" />
           <div className="flex flex-1 items-center justify-between">
             <span className="text-sm font-medium">{titles[pathname] ?? "HMS"}</span>
-            <Button size="sm" className="gap-1.5">
-              <PlusIcon className="size-3.5" />
-              New
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button size="sm" className="gap-1.5">
+                    <PlusIcon className="size-3.5" />
+                    New
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem render={<Link to="/pages?new=1" />}>Page</DropdownMenuItem>
+                <DropdownMenuItem render={<Link to="/blog?new=1" />}>Post</DropdownMenuItem>
+                <DropdownMenuItem render={<Link to="/products?new=1" />}>Product</DropdownMenuItem>
+                <DropdownMenuItem render={<Link to="/media" />}>Upload</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 

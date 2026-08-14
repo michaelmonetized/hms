@@ -1,5 +1,6 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireIdentity } from "./lib/auth";
 
 /**
  * Upsert user
@@ -50,5 +51,37 @@ export const me = query({
       .query("users")
       .withIndex("by_clerk", (q) => q.eq("clerkId", identity.subject))
       .unique();
+  },
+});
+
+/**
+ * Ensure user
+ * Creates or updates the users row for the signed-in Clerk identity.
+ * @returns The user's Convex document ID
+ */
+export const ensure = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await requireIdentity(ctx);
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_clerk", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    const email = identity.email ?? existing?.email ?? "";
+    const name = identity.name ?? existing?.name;
+    const imageUrl = identity.pictureUrl ?? existing?.imageUrl;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { email, name, imageUrl });
+      return existing._id;
+    }
+
+    return ctx.db.insert("users", {
+      clerkId: identity.subject,
+      email,
+      name,
+      imageUrl,
+    });
   },
 });

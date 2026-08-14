@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireIdentity } from "./lib/auth";
 
 /**
  * List media
@@ -9,11 +10,24 @@ import { v } from "convex/values";
 export const list = query({
   args: { siteId: v.id("sites") },
   handler: async (ctx, { siteId }) => {
+    await requireIdentity(ctx);
     return ctx.db
       .query("media")
       .withIndex("by_site", (q) => q.eq("siteId", siteId))
       .order("desc")
       .collect();
+  },
+});
+
+/**
+ * Generate upload URL
+ * @returns A short-lived Convex storage upload URL
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireIdentity(ctx);
+    return ctx.storage.generateUploadUrl();
   },
 });
 
@@ -36,10 +50,9 @@ export const record = mutation({
     size: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    const identity = await requireIdentity(ctx);
 
-    const url = await ctx.storage.getUrl(args.storageId);
+    const url = await ctx.storage.getUrl(args.storageId as never);
 
     return ctx.db.insert("media", {
       ...args,
@@ -58,13 +71,12 @@ export const record = mutation({
 export const remove = mutation({
   args: { id: v.id("media") },
   handler: async (ctx, { id }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    await requireIdentity(ctx);
 
     const doc = await ctx.db.get(id);
     if (!doc || !("storageId" in doc)) return;
 
-    await ctx.storage.delete(doc.storageId);
+    await ctx.storage.delete(doc.storageId as never);
     await ctx.db.delete(id);
   },
 });

@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireIdentity } from "./lib/auth";
 
 /**
  * List posts
@@ -9,11 +10,26 @@ import { v } from "convex/values";
 export const list = query({
   args: { siteId: v.id("sites") },
   handler: async (ctx, { siteId }) => {
+    await requireIdentity(ctx);
     return ctx.db
       .query("posts")
       .withIndex("by_site", (q) => q.eq("siteId", siteId))
       .order("desc")
       .collect();
+  },
+});
+
+/**
+ * Published posts
+ */
+export const published = query({
+  args: { siteId: v.id("sites") },
+  handler: async (ctx, { siteId }) => {
+    const posts = await ctx.db
+      .query("posts")
+      .withIndex("by_site", (q) => q.eq("siteId", siteId))
+      .collect();
+    return posts.filter((post) => post.status === "published");
   },
 });
 
@@ -31,8 +47,13 @@ export const create = mutation({
     slug: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    const identity = await requireIdentity(ctx);
+
+    const duplicate = await ctx.db
+      .query("posts")
+      .withIndex("by_slug", (q) => q.eq("siteId", args.siteId).eq("slug", args.slug))
+      .unique();
+    if (duplicate) throw new Error("Slug is already in use");
 
     return ctx.db.insert("posts", {
       ...args,
@@ -65,21 +86,22 @@ export const update = mutation({
         description: v.optional(v.string()),
       }),
     ),
+    snapshot: v.optional(v.boolean()),
   },
-  handler: async (ctx, { id, ...patch }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+  handler: async (ctx, { id, snapshot, ...patch }) => {
+    const identity = await requireIdentity(ctx);
 
     const existing = await ctx.db.get(id);
     if (!existing || !("content" in existing)) throw new Error("Post not found");
 
-    await ctx.db.insert("revisions", {
-      entityType: "post",
-      entityId: id,
-      content: existing.content,
-      createdBy: identity.subject,
-      createdAt: Date.now(),
-    });
+    if (patch.content !== undefined && snapshot !== false)
+      await ctx.db.insert("revisions", {
+        entityType: "post",
+        entityId: id,
+        content: existing.content,
+        createdBy: identity.subject,
+        createdAt: Date.now(),
+      });
 
     await ctx.db.patch(id, { ...patch, updatedAt: Date.now() });
   },
@@ -92,8 +114,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("posts") },
   handler: async (ctx, { id }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    await requireIdentity(ctx);
     await ctx.db.delete(id);
   },
 });

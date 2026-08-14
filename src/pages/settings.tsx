@@ -1,46 +1,63 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { useAction } from "convex/react";
 import { GlobeIcon, SearchIcon, CreditCardIcon, KeyIcon, CheckIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useHMS } from "@/hooks/use-hms";
+import { api } from "@/lib/convex-api";
+import { hasClerk, hasConvex, isLive } from "@/lib/env";
+import { toast } from "@/components/ui/lib";
 
 export default function Settings() {
+  const hms = useHMS();
   const [activeTab, setActiveTab] = useState<"general" | "seo" | "commerce" | "integrations">(
     "general",
   );
   const [isSaved, setIsSaved] = useState(false);
 
-  // Form states
+  const site = hms.site;
+  const settings = site?.settings ?? {};
+
   const [general, setGeneral] = useState({
-    siteName: "HMS Demo Site",
-    description: "Full-featured TanStack Start core with Convex & real-time JSON page builder.",
-    domain: "hms.app",
-    language: "en-US",
+    siteName: site?.name ?? "",
+    description: site?.description ?? "",
+    domain: site?.domain ?? "",
+    language: settings.language ?? "en-US",
   });
 
   const [seo, setSeo] = useState({
-    metaTitle: "%s | HMS System",
-    metaDescription: "Move fast, break stuff, and hustle hard with HMS.",
-    ogImage: "https://hms.app/og.png",
-    twitterHandle: "@hms_app",
+    metaTitle: settings.seo?.metaTitle ?? "%s | HMS",
+    metaDescription: settings.seo?.metaDescription ?? "",
+    ogImage: settings.seo?.ogImage ?? "",
+    twitterHandle: settings.seo?.twitterHandle ?? "",
   });
 
   const [commerce, setCommerce] = useState({
-    currency: "USD",
-    stripeKey: "pk_test_hms_stripe_12345",
-    taxRate: "8.5",
-    shippingFee: "5.00",
+    currency: settings.commerce?.currency ?? "USD",
+    stripeKey: settings.commerce?.stripeKey ?? "",
+    taxRate: settings.commerce?.taxRate ?? "0",
+    shippingFee: settings.commerce?.shippingFee ?? "0",
   });
 
-  const [integrations, setIntegrations] = useState({
-    resendApiKey: "re_123456789_hms",
-    convexUrl: import.meta.env.VITE_CONVEX_URL || "https://demo.convex.cloud",
-    clerkKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "pk_test_demo_clerk",
-  });
-
-  const handleSave = () => {
+  const handleSave = async () => {
+    await hms.updateSite({
+      name: general.siteName,
+      description: general.description,
+      domain: general.domain,
+      settings: {
+        language: general.language,
+        seo,
+        commerce,
+      },
+    });
     setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+    toast.add({ title: "Settings saved", type: "success" });
+    window.setTimeout(() => setIsSaved(false), 2000);
   };
+
+  if (!hms.ready || !site) {
+    return <div className="text-sm text-muted-foreground">Loading settings…</div>;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,10 +69,10 @@ export default function Settings() {
           </p>
         </div>
 
-        <Button size="sm" onClick={handleSave} className="gap-1.5">
+        <Button size="sm" onClick={() => void handleSave()} className="gap-1.5">
           {isSaved ? (
             <>
-              <CheckIcon className="size-3.5 text-emerald-400" /> Saved!
+              <CheckIcon className="size-3.5 text-emerald-400" /> Saved
             </>
           ) : (
             <>
@@ -65,157 +82,102 @@ export default function Settings() {
         </Button>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b text-sm font-medium">
-        <button
-          onClick={() => setActiveTab("general")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 transition-colors ${
-            activeTab === "general"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <GlobeIcon className="size-4" /> General
-        </button>
-        <button
-          onClick={() => setActiveTab("seo")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 transition-colors ${
-            activeTab === "seo"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <SearchIcon className="size-4" /> SEO
-        </button>
-        <button
-          onClick={() => setActiveTab("commerce")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 transition-colors ${
-            activeTab === "commerce"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <CreditCardIcon className="size-4" /> Commerce
-        </button>
-        <button
-          onClick={() => setActiveTab("integrations")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 transition-colors ${
-            activeTab === "integrations"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <KeyIcon className="size-4" /> Integrations
-        </button>
+        {(
+          [
+            ["general", GlobeIcon, "General"],
+            ["seo", SearchIcon, "SEO"],
+            ["commerce", CreditCardIcon, "Commerce"],
+            ["integrations", KeyIcon, "Integrations"],
+          ] as const
+        ).map(([tab, Icon, label]) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex items-center gap-2 border-b-2 px-4 py-2.5 transition-colors ${
+              activeTab === tab
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon className="size-4" /> {label}
+          </button>
+        ))}
       </div>
 
-      {/* General Settings */}
       {activeTab === "general" && (
         <div className="flex max-w-2xl flex-col gap-4 rounded-xl border bg-card p-6 shadow-xs">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Site Name
-            </label>
+          <Field label="Site Name">
             <Input
               value={general.siteName}
-              onChange={(e) => setGeneral({ ...general, siteName: e.target.value })}
+              onChange={(event) => setGeneral({ ...general, siteName: event.target.value })}
             />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Site Description
-            </label>
+          </Field>
+          <Field label="Site Description">
             <textarea
               value={general.description}
-              onChange={(e) => setGeneral({ ...general, description: e.target.value })}
+              onChange={(event) => setGeneral({ ...general, description: event.target.value })}
               rows={3}
               className="w-full rounded-md border bg-background p-2.5 text-sm"
             />
-          </div>
-
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Custom Domain
-              </label>
+            <Field label="Custom Domain">
               <Input
                 value={general.domain}
-                onChange={(e) => setGeneral({ ...general, domain: e.target.value })}
+                onChange={(event) => setGeneral({ ...general, domain: event.target.value })}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Language
-              </label>
+            </Field>
+            <Field label="Language">
               <Input
                 value={general.language}
-                onChange={(e) => setGeneral({ ...general, language: e.target.value })}
+                onChange={(event) => setGeneral({ ...general, language: event.target.value })}
               />
-            </div>
+            </Field>
           </div>
         </div>
       )}
 
-      {/* SEO Settings */}
       {activeTab === "seo" && (
         <div className="flex max-w-2xl flex-col gap-4 rounded-xl border bg-card p-6 shadow-xs">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Meta Title Format
-            </label>
+          <Field label="Meta Title Format">
             <Input
               value={seo.metaTitle}
-              onChange={(e) => setSeo({ ...seo, metaTitle: e.target.value })}
+              onChange={(event) => setSeo({ ...seo, metaTitle: event.target.value })}
             />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Default Meta Description
-            </label>
+          </Field>
+          <Field label="Default Meta Description">
             <textarea
               value={seo.metaDescription}
-              onChange={(e) => setSeo({ ...seo, metaDescription: e.target.value })}
+              onChange={(event) => setSeo({ ...seo, metaDescription: event.target.value })}
               rows={3}
               className="w-full rounded-md border bg-background p-2.5 text-sm"
             />
-          </div>
-
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                OpenGraph Image URL
-              </label>
+            <Field label="OpenGraph Image URL">
               <Input
                 value={seo.ogImage}
-                onChange={(e) => setSeo({ ...seo, ogImage: e.target.value })}
+                onChange={(event) => setSeo({ ...seo, ogImage: event.target.value })}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Twitter / X Handle
-              </label>
+            </Field>
+            <Field label="Twitter / X Handle">
               <Input
                 value={seo.twitterHandle}
-                onChange={(e) => setSeo({ ...seo, twitterHandle: e.target.value })}
+                onChange={(event) => setSeo({ ...seo, twitterHandle: event.target.value })}
               />
-            </div>
+            </Field>
           </div>
         </div>
       )}
 
-      {/* Commerce Settings */}
       {activeTab === "commerce" && (
         <div className="flex max-w-2xl flex-col gap-4 rounded-xl border bg-card p-6 shadow-xs">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Currency
-              </label>
+            <Field label="Currency">
               <select
                 value={commerce.currency}
-                onChange={(e) => setCommerce({ ...commerce, currency: e.target.value })}
+                onChange={(event) => setCommerce({ ...commerce, currency: event.target.value })}
                 className="rounded-md border bg-background px-3 py-2 text-sm"
               >
                 <option value="USD">USD ($)</option>
@@ -223,82 +185,79 @@ export default function Settings() {
                 <option value="GBP">GBP (£)</option>
                 <option value="CAD">CAD ($)</option>
               </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Tax Rate (%)
-              </label>
+            </Field>
+            <Field label="Tax Rate (%)">
               <Input
                 value={commerce.taxRate}
-                onChange={(e) => setCommerce({ ...commerce, taxRate: e.target.value })}
+                onChange={(event) => setCommerce({ ...commerce, taxRate: event.target.value })}
               />
-            </div>
+            </Field>
           </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Stripe Publishable Key
-            </label>
+          <Field label="Stripe Publishable Key">
             <Input
               value={commerce.stripeKey}
-              onChange={(e) => setCommerce({ ...commerce, stripeKey: e.target.value })}
+              onChange={(event) => setCommerce({ ...commerce, stripeKey: event.target.value })}
               type="password"
             />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Default Shipping Fee ($)
-            </label>
+          </Field>
+          <Field label="Default Shipping Fee ($)">
             <Input
               value={commerce.shippingFee}
-              onChange={(e) => setCommerce({ ...commerce, shippingFee: e.target.value })}
+              onChange={(event) => setCommerce({ ...commerce, shippingFee: event.target.value })}
             />
-          </div>
+          </Field>
         </div>
       )}
 
-      {/* Integrations Settings */}
       {activeTab === "integrations" && (
         <div className="flex max-w-2xl flex-col gap-4 rounded-xl border bg-card p-6 shadow-xs">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Resend Email API Key
-            </label>
-            <Input
-              value={integrations.resendApiKey}
-              onChange={(e) =>
-                setIntegrations({
-                  ...integrations,
-                  resendApiKey: e.target.value,
-                })
-              }
-              type="password"
-            />
+          <div className="rounded-lg border bg-muted/40 p-4 text-xs text-muted-foreground">
+            Convex is {hasConvex ? "connected" : "not configured"}. Clerk is{" "}
+            {hasClerk ? "connected" : "not configured"}. Resend is configured on the Convex
+            deployment. Keys live in environment variables, not this form.
           </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Convex Deployment URL
-            </label>
-            <Input
-              value={integrations.convexUrl}
-              onChange={(e) => setIntegrations({ ...integrations, convexUrl: e.target.value })}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Clerk Publishable Key
-            </label>
-            <Input
-              value={integrations.clerkKey}
-              onChange={(e) => setIntegrations({ ...integrations, clerkKey: e.target.value })}
-            />
-          </div>
+          {isLive ? <SendTestEmail /> : null}
         </div>
       )}
+    </div>
+  );
+}
+
+function SendTestEmail() {
+  const sendTest = useAction(api.email.sendTest);
+  const [sending, setSending] = useState(false);
+
+  return (
+    <Button
+      size="sm"
+      disabled={sending}
+      onClick={() => {
+        setSending(true);
+        void sendTest({})
+          .then((result) => {
+            toast.add({ title: `Test email sent to ${result.to}`, type: "success" });
+          })
+          .catch((error: unknown) => {
+            toast.add({
+              title: error instanceof Error ? error.message : "Could not send test email",
+              type: "error",
+            });
+          })
+          .finally(() => setSending(false));
+      }}
+    >
+      {sending ? "Sending…" : "Send test email"}
+    </Button>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }

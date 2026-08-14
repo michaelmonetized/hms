@@ -7,13 +7,38 @@ export const UserSchema = z.object({
   imageUrl: z.string().url().optional(),
 });
 
+export const SiteSettingsSchema = z.object({
+  language: z.string().optional(),
+  seo: z
+    .object({
+      metaTitle: z.string().optional(),
+      metaDescription: z.string().optional(),
+      ogImage: z.string().optional(),
+      twitterHandle: z.string().optional(),
+    })
+    .optional(),
+  commerce: z
+    .object({
+      currency: z.string().optional(),
+      stripeKey: z.string().optional(),
+      taxRate: z.string().optional(),
+      shippingFee: z.string().optional(),
+    })
+    .optional(),
+  integrations: z
+    .object({
+      resendApiKey: z.string().optional(),
+    })
+    .optional(),
+});
+
 export const SiteSchema = z.object({
   name: z.string().min(1, "Site name is required"),
   domain: z.string().optional(),
   description: z.string().optional(),
   logo: z.string().optional(),
   ownerId: z.string(),
-  settings: z.record(z.string(), z.any()).optional(),
+  settings: SiteSettingsSchema.optional(),
 });
 
 export const PageSchema = z.object({
@@ -96,6 +121,7 @@ export const VariantSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+export type SiteSettings = z.infer<typeof SiteSettingsSchema>;
 export type Site = z.infer<typeof SiteSchema>;
 export type Page = z.infer<typeof PageSchema>;
 export type Post = z.infer<typeof PostSchema>;

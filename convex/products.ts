@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireIdentity } from "./lib/auth";
 
 /**
  * List products
@@ -9,11 +10,26 @@ import { v } from "convex/values";
 export const list = query({
   args: { siteId: v.id("sites") },
   handler: async (ctx, { siteId }) => {
+    await requireIdentity(ctx);
     return ctx.db
       .query("products")
       .withIndex("by_site", (q) => q.eq("siteId", siteId))
       .order("desc")
       .collect();
+  },
+});
+
+/**
+ * Published products
+ */
+export const published = query({
+  args: { siteId: v.id("sites") },
+  handler: async (ctx, { siteId }) => {
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_site", (q) => q.eq("siteId", siteId))
+      .collect();
+    return products.filter((product) => product.status === "active");
   },
 });
 
@@ -35,8 +51,13 @@ export const create = mutation({
     price: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    const identity = await requireIdentity(ctx);
+
+    const duplicate = await ctx.db
+      .query("products")
+      .withIndex("by_slug", (q) => q.eq("siteId", args.siteId).eq("slug", args.slug))
+      .unique();
+    if (duplicate) throw new Error("Slug is already in use");
 
     return ctx.db.insert("products", {
       ...args,
@@ -65,8 +86,7 @@ export const update = mutation({
     stripePriceId: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...patch }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    await requireIdentity(ctx);
     await ctx.db.patch(id, { ...patch, updatedAt: Date.now() });
   },
 });
@@ -78,8 +98,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("products") },
   handler: async (ctx, { id }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthorized");
+    await requireIdentity(ctx);
     await ctx.db.delete(id);
   },
 });
