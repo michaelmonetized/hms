@@ -4,8 +4,9 @@
 
 ### Public site is the product
 
-- Visitors land on the live site at `/`, `/blog`, `/blog/:slug`, `/shop`, `/shop/:slug`, and `/:slug`.
-- Workspace management moved under `/manage/*` (pages, blog, products, media, settings).
+- Visitors land on the live site at `/`, `/blog`, `/blog/:slug`, `/shop`, `/shop/:slug`, `/search`, `/:type/:entry`, and `/:slug`.
+- Theme header and footer render from templates; missing pages use the 404 template.
+- Workspace management moved under `/manage/*` (pages, blog, products, media, library, types, settings).
 - Old workspace paths redirect into `/manage`.
 - Signed-in users can open `?edit=1` and edit the page in place. The site is the editor.
 
@@ -37,7 +38,8 @@
 ### Data layer
 
 - Local store with seed data for offline/dev work; Convex when Clerk + Convex are configured.
-- Shared `useHMS` data provider wires pages, posts, products, media, revisions, and variants.
+- Shared `useHMS` data provider wires pages, posts, products, media, revisions, variants, blueprints, content types, entries, and submissions.
+- Cart lines persist in localStorage.
 - Site `getOrCreate` seeds a draft home page on first run.
 - Published-only queries for visitor-facing pages, posts, and products.
 - Slug uniqueness enforced on create.
@@ -58,6 +60,8 @@
 - Route guard for `/manage/*`.
 - Env flags centralized in `src/lib/env.ts`.
 - New menu: Page, Post, Product, Upload.
+- Library and content-type editors under `/manage/library` and `/manage/types`.
+- Reserved public paths: `/search` plus blog and shop.
 - Toasts wired through providers.
 
 ### Tooling
