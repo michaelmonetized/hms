@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PackageIcon, PlusIcon, Trash2Icon, PencilIcon, ArrowLeftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import type { StoredProduct } from "@/lib/store";
 
 export default function Products() {
   const hms = useHMS();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const editingId = params.get("edit");
   const editing = hms.products.find((product) => product._id === editingId) ?? null;
@@ -37,6 +38,27 @@ export default function Products() {
     setPrice("");
     toast.add({ title: "Product created", type: "success" });
     open(id);
+  };
+
+  const archive = hms.blueprints.find(
+    (item) => item.kind === "template" && item.appliesTo === "product-archive",
+  );
+  const single = hms.blueprints.find(
+    (item) => item.kind === "template" && item.appliesTo === "product-single",
+  );
+
+  const openTemplate = async (surface: "product-archive" | "product-single") => {
+    const existing = surface === "product-archive" ? archive : single;
+    if (existing) {
+      void navigate(`/manage/library/${existing._id}`);
+      return;
+    }
+    const id = await hms.createBlueprint({
+      name: surface === "product-archive" ? "Shop archive" : "Product single",
+      kind: "template",
+      appliesTo: surface,
+    });
+    void navigate(`/manage/library/${id}`);
   };
 
   if (!hms.ready) {
@@ -158,10 +180,18 @@ export default function Products() {
             Physical items, digital downloads, and recurring subscriptions.
           </p>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)} className="gap-1.5">
-          <PlusIcon className="size-3.5" />
-          New Product
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => void openTemplate("product-archive")}>
+            Archive template
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void openTemplate("product-single")}>
+            Single template
+          </Button>
+          <Button size="sm" onClick={() => setIsCreating(true)} className="gap-1.5">
+            <PlusIcon className="size-3.5" />
+            New Product
+          </Button>
+        </div>
       </div>
 
       {isCreating && (

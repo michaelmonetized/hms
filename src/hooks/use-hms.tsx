@@ -13,12 +13,19 @@ import { isLive } from "@/lib/env";
 import { toast } from "@/components/ui/lib";
 import { normalizeContent, normalizeSlug, slugify, type PageContent } from "@/lib/content";
 import {
+  addBlueprint,
+  addContentType,
+  addEntry,
   addMedia,
   addPage,
   addPost,
   addProduct,
+  addSubmission,
   addVariant,
   loadState,
+  removeBlueprint,
+  removeContentType,
+  removeEntry,
   removeMedia,
   removePage,
   removePost,
@@ -27,20 +34,28 @@ import {
   restoreRevision,
   saveState,
   seedState,
+  updateBlueprint,
+  updateContentType,
+  updateEntry,
   updatePage,
   updatePost,
   updateProduct,
   updateSite,
   updateVariant,
   type HMSState,
+  type StoredBlueprint,
+  type StoredContentType,
+  type StoredEntry,
   type StoredMedia,
   type StoredPage,
   type StoredPost,
   type StoredProduct,
   type StoredRevision,
   type StoredSite,
+  type StoredSubmission,
   type StoredVariant,
 } from "@/lib/store";
+import type { BlueprintKind, ContentField, TemplateSurface } from "@/lib/blueprints";
 import { useHMSAuth } from "@/hooks/use-hms-auth";
 
 type PagePatch = Partial<Pick<StoredPage, "title" | "slug" | "status" | "content" | "meta">>;
@@ -64,6 +79,10 @@ export type HMSContextValue = {
   media: StoredMedia[];
   revisions: StoredRevision[];
   variants: StoredVariant[];
+  blueprints: StoredBlueprint[];
+  contentTypes: StoredContentType[];
+  entries: StoredEntry[];
+  submissions: StoredSubmission[];
   createPage: (input: { title: string; slug?: string; content?: PageContent }) => Promise<string>;
   updatePage: (id: string, patch: PagePatch, options?: { snapshot?: boolean }) => Promise<void>;
   removePage: (id: string) => Promise<void>;
@@ -101,6 +120,42 @@ export type HMSContextValue = {
     patch: Partial<Pick<StoredVariant, "name" | "content" | "traffic" | "isWinner">>,
   ) => Promise<void>;
   removeVariant: (id: string) => Promise<void>;
+  createBlueprint: (input: {
+    name: string;
+    kind: BlueprintKind;
+    appliesTo?: TemplateSurface;
+    contentTypeId?: string;
+    content?: PageContent;
+  }) => Promise<string>;
+  updateBlueprint: (
+    id: string,
+    patch: Partial<Pick<StoredBlueprint, "name" | "content" | "appliesTo" | "contentTypeId">>,
+  ) => Promise<void>;
+  removeBlueprint: (id: string) => Promise<void>;
+  createContentType: (input: {
+    name: string;
+    slug?: string;
+    plural?: string;
+    fields?: ContentField[];
+  }) => Promise<string>;
+  updateContentType: (
+    id: string,
+    patch: Partial<Pick<StoredContentType, "name" | "slug" | "plural" | "fields">>,
+  ) => Promise<void>;
+  removeContentType: (id: string) => Promise<void>;
+  createEntry: (input: {
+    contentTypeId: string;
+    title: string;
+    slug?: string;
+    fields?: Record<string, string>;
+    content?: PageContent;
+  }) => Promise<string>;
+  updateEntry: (
+    id: string,
+    patch: Partial<Pick<StoredEntry, "title" | "slug" | "status" | "fields" | "content">>,
+  ) => Promise<void>;
+  removeEntry: (id: string) => Promise<void>;
+  submitForm: (formId: string, values: Record<string, string>) => Promise<void>;
 };
 
 const HMSContext = createContext<HMSContextValue | null>(null);
@@ -214,6 +269,56 @@ function asVariant(doc: Record<string, unknown>): StoredVariant {
   };
 }
 
+function asBlueprint(doc: Record<string, unknown>): StoredBlueprint {
+  const kind =
+    doc.kind === "form" || doc.kind === "loop-item" || doc.kind === "template"
+      ? doc.kind
+      : "component";
+  return {
+    _id: asString(doc._id),
+    _creationTime: Number(doc._creationTime ?? Date.now()),
+    siteId: asString(doc.siteId),
+    name: asString(doc.name, "Untitled"),
+    kind,
+    appliesTo: doc.appliesTo as StoredBlueprint["appliesTo"],
+    contentTypeId: typeof doc.contentTypeId === "string" ? doc.contentTypeId : undefined,
+    content: normalizeContent(doc.content),
+    createdBy: asString(doc.createdBy),
+    updatedAt: Number(doc.updatedAt ?? Date.now()),
+  };
+}
+
+function asContentType(doc: Record<string, unknown>): StoredContentType {
+  return {
+    _id: asString(doc._id),
+    _creationTime: Number(doc._creationTime ?? Date.now()),
+    siteId: asString(doc.siteId),
+    name: asString(doc.name),
+    slug: normalizeSlug(asString(doc.slug, asString(doc.name))),
+    plural: asString(doc.plural, `${asString(doc.name)}s`),
+    fields: Array.isArray(doc.fields) ? (doc.fields as StoredContentType["fields"]) : [],
+    createdBy: asString(doc.createdBy),
+    updatedAt: Number(doc.updatedAt ?? Date.now()),
+  };
+}
+
+function asEntry(doc: Record<string, unknown>): StoredEntry {
+  return {
+    _id: asString(doc._id),
+    _creationTime: Number(doc._creationTime ?? Date.now()),
+    siteId: asString(doc.siteId),
+    contentTypeId: asString(doc.contentTypeId),
+    title: asString(doc.title),
+    slug: normalizeSlug(asString(doc.slug, asString(doc.title))),
+    status: doc.status === "published" ? "published" : "draft",
+    fields:
+      doc.fields && typeof doc.fields === "object" ? (doc.fields as Record<string, string>) : {},
+    content: normalizeContent(doc.content),
+    createdBy: asString(doc.createdBy),
+    updatedAt: Number(doc.updatedAt ?? Date.now()),
+  };
+}
+
 function asSite(doc: Record<string, unknown>): StoredSite {
   return {
     _id: asString(doc._id),
@@ -263,6 +368,10 @@ function LocalDataProvider({ children }: { children: ReactNode }) {
       media: state.media,
       revisions: state.revisions,
       variants: state.variants,
+      blueprints: state.blueprints,
+      contentTypes: state.contentTypes,
+      entries: state.entries,
+      submissions: state.submissions,
       createPage: async (input) => {
         let id = "";
         setState((prev) => {
@@ -347,6 +456,54 @@ function LocalDataProvider({ children }: { children: ReactNode }) {
       removeVariant: async (id) => {
         setState((prev) => removeVariant(prev, id));
       },
+      createBlueprint: async (input) => {
+        let id = "";
+        setState((prev) => {
+          const result = addBlueprint(prev, input);
+          id = result.id;
+          return result.next;
+        });
+        return id;
+      },
+      updateBlueprint: async (id, patch) => {
+        setState((prev) => updateBlueprint(prev, id, patch));
+      },
+      removeBlueprint: async (id) => {
+        setState((prev) => removeBlueprint(prev, id));
+      },
+      createContentType: async (input) => {
+        let id = "";
+        setState((prev) => {
+          const result = addContentType(prev, input);
+          id = result.id;
+          return result.next;
+        });
+        return id;
+      },
+      updateContentType: async (id, patch) => {
+        setState((prev) => updateContentType(prev, id, patch));
+      },
+      removeContentType: async (id) => {
+        setState((prev) => removeContentType(prev, id));
+      },
+      createEntry: async (input) => {
+        let id = "";
+        setState((prev) => {
+          const result = addEntry(prev, input);
+          id = result.id;
+          return result.next;
+        });
+        return id;
+      },
+      updateEntry: async (id, patch) => {
+        setState((prev) => updateEntry(prev, id, patch));
+      },
+      removeEntry: async (id) => {
+        setState((prev) => removeEntry(prev, id));
+      },
+      submitForm: async (formId, values) => {
+        setState((prev) => addSubmission(prev, { formId, values }).next);
+      },
     };
   }, [state]);
 
@@ -367,6 +524,9 @@ function LiveDataProvider({ children }: { children: ReactNode }) {
   const rawMedia = useQuery(api.media.list, isSignedIn && siteId ? { siteId } : "skip");
   const rawRevisions = useQuery(api.revisions.recent, isSignedIn ? {} : "skip");
   const rawVariants = useQuery(api.variants.all, {});
+  const rawBlueprints = useQuery(api.blueprints.list, pageArgs);
+  const rawTypes = useQuery(api.contentTypes.list, pageArgs);
+  const rawEntries = useQuery(isSignedIn ? api.entries.list : api.entries.published, pageArgs);
 
   const createPageMut = useMutation(api.pages.create);
   const updatePageMut = useMutation(api.pages.update);
@@ -385,6 +545,16 @@ function LiveDataProvider({ children }: { children: ReactNode }) {
   const createVariantMut = useMutation(api.variants.create);
   const updateVariantMut = useMutation(api.variants.update);
   const removeVariantMut = useMutation(api.variants.remove);
+  const createBlueprintMut = useMutation(api.blueprints.create);
+  const updateBlueprintMut = useMutation(api.blueprints.update);
+  const removeBlueprintMut = useMutation(api.blueprints.remove);
+  const createTypeMut = useMutation(api.contentTypes.create);
+  const updateTypeMut = useMutation(api.contentTypes.update);
+  const removeTypeMut = useMutation(api.contentTypes.remove);
+  const createEntryMut = useMutation(api.entries.create);
+  const updateEntryMut = useMutation(api.entries.update);
+  const removeEntryMut = useMutation(api.entries.remove);
+  const submitFormMut = useMutation(api.submissions.create);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -412,6 +582,15 @@ function LiveDataProvider({ children }: { children: ReactNode }) {
   );
   const variants = ((rawVariants ?? []) as unknown[]).map((doc) =>
     asVariant(doc as Record<string, unknown>),
+  );
+  const blueprints = ((rawBlueprints ?? []) as unknown[]).map((doc) =>
+    asBlueprint(doc as Record<string, unknown>),
+  );
+  const contentTypes = ((rawTypes ?? []) as unknown[]).map((doc) =>
+    asContentType(doc as Record<string, unknown>),
+  );
+  const entries = ((rawEntries ?? []) as unknown[]).map((doc) =>
+    asEntry(doc as Record<string, unknown>),
   );
 
   const ready =
@@ -441,6 +620,10 @@ function LiveDataProvider({ children }: { children: ReactNode }) {
       media,
       revisions,
       variants,
+      blueprints,
+      contentTypes,
+      entries,
+      submissions: [],
       createPage: createPageFn,
       updatePage: async (id, patch, options) => {
         await updatePageMut({ id, ...patch, snapshot: options?.snapshot });
@@ -530,12 +713,76 @@ function LiveDataProvider({ children }: { children: ReactNode }) {
       removeVariant: async (id) => {
         await removeVariantMut({ id });
       },
+      createBlueprint: async (input) => {
+        if (!site) throw new Error("No site");
+        const id = await createBlueprintMut({
+          siteId: site._id,
+          name: input.name,
+          kind: input.kind,
+          appliesTo: input.appliesTo,
+          contentTypeId: input.contentTypeId,
+          content: input.content,
+        });
+        return String(id);
+      },
+      updateBlueprint: async (id, patch) => {
+        await updateBlueprintMut({ id, ...patch });
+      },
+      removeBlueprint: async (id) => {
+        await removeBlueprintMut({ id });
+      },
+      createContentType: async (input) => {
+        if (!site) throw new Error("No site");
+        const slug = normalizeSlug(input.slug ?? input.name);
+        const id = await createTypeMut({
+          siteId: site._id,
+          name: input.name,
+          slug,
+          plural: input.plural ?? `${input.name}s`,
+          fields: input.fields ?? [],
+        });
+        return String(id);
+      },
+      updateContentType: async (id, patch) => {
+        await updateTypeMut({ id, ...patch });
+      },
+      removeContentType: async (id) => {
+        await removeTypeMut({ id });
+      },
+      createEntry: async (input) => {
+        if (!site) throw new Error("No site");
+        const slug = normalizeSlug(input.slug ?? input.title);
+        const id = await createEntryMut({
+          siteId: site._id,
+          contentTypeId: input.contentTypeId,
+          title: input.title,
+          slug,
+          fields: input.fields,
+          content: input.content,
+        });
+        return String(id);
+      },
+      updateEntry: async (id, patch) => {
+        await updateEntryMut({ id, ...patch });
+      },
+      removeEntry: async (id) => {
+        await removeEntryMut({ id });
+      },
+      submitForm: async (formId, values) => {
+        await submitFormMut({ formId, values });
+      },
     };
   }, [
+    blueprints,
+    contentTypes,
+    createBlueprintMut,
+    createEntryMut,
     createPageFn,
     createPostMut,
     createProductMut,
+    createTypeMut,
     createVariantMut,
+    entries,
     generateUploadUrl,
     media,
     pages,
@@ -543,18 +790,25 @@ function LiveDataProvider({ children }: { children: ReactNode }) {
     products,
     ready,
     recordMedia,
+    removeBlueprintMut,
+    removeEntryMut,
     removeMediaMut,
     removePageMut,
     removePostMut,
     removeProductMut,
+    removeTypeMut,
     removeVariantMut,
     restoreRevisionMut,
     revisions,
     site,
+    submitFormMut,
+    updateBlueprintMut,
+    updateEntryMut,
     updatePageMut,
     updatePostMut,
     updateProductMut,
     updateSiteMut,
+    updateTypeMut,
     updateVariantMut,
     variants,
   ]);

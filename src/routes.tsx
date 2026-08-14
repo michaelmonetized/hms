@@ -7,7 +7,18 @@ import Products from "@/pages/products";
 import Media from "@/pages/media";
 import Settings from "@/pages/settings";
 import SignInPage from "@/pages/sign-in";
-import { SiteBlogIndex, SitePage, SitePost, SiteProduct, SiteShop } from "@/pages/site";
+import Library, { LibraryEditor } from "@/pages/library";
+import Types, { TypeEditor } from "@/pages/types";
+import {
+  SiteBlogIndex,
+  SiteEntry,
+  SitePage,
+  SitePost,
+  SiteProduct,
+  SiteSearch,
+  SiteShop,
+  SiteSlug,
+} from "@/pages/site";
 
 const router = createBrowserRouter([
   {
@@ -22,11 +33,16 @@ const router = createBrowserRouter([
       { path: "/blog/:slug", element: <SitePost /> },
       { path: "/shop", element: <SiteShop /> },
       { path: "/shop/:slug", element: <SiteProduct /> },
+      { path: "/search", element: <SiteSearch /> },
       {
         element: <RequireAuth />,
         children: [
           { path: "/manage/pages", element: <Pages /> },
           { path: "/manage/blog", element: <Blog /> },
+          { path: "/manage/library", element: <Library /> },
+          { path: "/manage/library/:id", element: <LibraryEditor /> },
+          { path: "/manage/types", element: <Types /> },
+          { path: "/manage/types/:id", element: <TypeEditor /> },
           { path: "/manage/products", element: <Products /> },
           { path: "/manage/media", element: <Media /> },
           { path: "/manage/settings", element: <Settings /> },
@@ -38,7 +54,8 @@ const router = createBrowserRouter([
       { path: "/settings", element: <Navigate to="/manage/settings" replace /> },
       { path: "/media", element: <Navigate to="/manage/media" replace /> },
       { path: "/products", element: <Navigate to="/manage/products" replace /> },
-      { path: "/:slug", element: <SitePage /> },
+      { path: "/:typeSlug/:entrySlug", element: <SiteEntry /> },
+      { path: "/:slug", element: <SiteSlug /> },
     ],
   },
 ]);

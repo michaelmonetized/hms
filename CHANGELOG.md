@@ -14,6 +14,25 @@
 - Block model covers hero, CTA, features, columns, stats, testimonials, FAQ, pricing, logos, collections, media, and basic text blocks.
 - Live editor with block renderer and inspector for on-canvas editing.
 - Collection blocks pull pages, posts, products, or media into grid, table, carousel, gallery, or list layouts.
+- Three-panel editor: structure navigator, device-framed canvas, Content / Style / Advanced / Dynamic inspector.
+- Undo/redo, keyboard shortcuts, right-click menu, copy/paste of blocks and styles, wrap in section or columns.
+- Finder (⌘K) to add widgets, jump to structure, apply templates, and run commands.
+- Dynamic tokens (`{{site.name}}`, `{{doc.title}}`, `{{user.name}}`, `{{query.*}}`, …) and visibility conditions (logged in, query, device).
+- Responsive canvas (desktop / tablet / mobile), outlines, inline copy editing, saved sections, starter layouts.
+- Section, HTML, and form widgets; FAQ renders as an accordion.
+- Forms are containers of field blocks; submissions persist.
+- Library of blueprints: forms, components, loop items, and templates — all edited in the live editor.
+- Collections can paint each row with a loop item (the grid builder).
+- Content types with fields, entries, and archive/single templates.
+- Blog archive and single templates; document-body slot for the post itself.
+- Visibility groups (AND/OR) with field, schedule, role, referrer, cookie, and fallback copy.
+- Token modifiers (`|upper`, `|truncate`, `|fallback`, `|date`) and type-aware field chips.
+- Collection query: filter, sort, search, related, exclude current, paginate, facet, load more, empty state.
+- Form actions: email notice, create entry, redirect; conditional fields.
+- Content fields: relation, repeater, and terms, with tokens `{{rel.*}}` and collection source `repeater:key`.
+- Theme templates: header, footer, 404, search, shop archive, and product single.
+- Menu, search, add-to-cart, and cart blocks; cart tokens `{{cart.count}}` and `{{cart.total}}`.
+- Visibility debug in the editor (why a block is hidden).
 
 ### Data layer
 

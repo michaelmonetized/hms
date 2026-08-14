@@ -1,4 +1,10 @@
 import {
+  defaultBlueprintTree,
+  type BlueprintKind,
+  type ContentField,
+  type TemplateSurface,
+} from "./blueprints";
+import {
   createBlock,
   newId,
   normalizeContent,
@@ -8,7 +14,7 @@ import {
 } from "./content";
 import type { Site } from "./schemas";
 
-export type EntityType = "page" | "post" | "product";
+export type EntityType = "page" | "post" | "product" | "blueprint" | "entry";
 
 export type StoredSite = Site & {
   _id: string;
@@ -96,6 +102,52 @@ export type StoredVariant = {
   createdBy: string;
 };
 
+export type StoredBlueprint = {
+  _id: string;
+  _creationTime: number;
+  siteId: string;
+  name: string;
+  kind: BlueprintKind;
+  appliesTo?: TemplateSurface;
+  contentTypeId?: string;
+  content: PageContent;
+  createdBy: string;
+  updatedAt: number;
+};
+
+export type StoredContentType = {
+  _id: string;
+  _creationTime: number;
+  siteId: string;
+  name: string;
+  slug: string;
+  plural: string;
+  fields: ContentField[];
+  createdBy: string;
+  updatedAt: number;
+};
+
+export type StoredEntry = {
+  _id: string;
+  _creationTime: number;
+  siteId: string;
+  contentTypeId: string;
+  title: string;
+  slug: string;
+  status: "published" | "draft";
+  fields: Record<string, string>;
+  content: PageContent;
+  createdBy: string;
+  updatedAt: number;
+};
+
+export type StoredSubmission = {
+  _id: string;
+  formId: string;
+  values: Record<string, string>;
+  createdAt: number;
+};
+
 export type HMSState = {
   site: StoredSite;
   pages: StoredPage[];
@@ -104,6 +156,10 @@ export type HMSState = {
   media: StoredMedia[];
   revisions: StoredRevision[];
   variants: StoredVariant[];
+  blueprints: StoredBlueprint[];
+  contentTypes: StoredContentType[];
+  entries: StoredEntry[];
+  submissions: StoredSubmission[];
 };
 
 const LOCAL_SITE_ID = "local_site";
@@ -161,6 +217,10 @@ export function emptyState(): HMSState {
     media: [],
     revisions: [],
     variants: [],
+    blueprints: [],
+    contentTypes: [],
+    entries: [],
+    submissions: [],
   };
 }
 
@@ -242,12 +302,13 @@ export function seedState(): HMSState {
     price: 4900,
     status: "active",
   });
-  return addProduct(product.next, {
+  const shop = addProduct(product.next, {
     name: "Starter Theme Pack",
     type: "digital",
     price: 2900,
     status: "active",
-  }).next;
+  });
+  return seedLibrary(shop.next);
 }
 
 /**
@@ -666,6 +727,368 @@ export function updateSite(
   };
 }
 
+/**
+ * Add blueprint
+ */
+export function addBlueprint(
+  state: HMSState,
+  input: {
+    name: string;
+    kind: BlueprintKind;
+    appliesTo?: TemplateSurface;
+    contentTypeId?: string;
+    content?: PageContent;
+  },
+): { next: HMSState; id: string } {
+  const created = now();
+  const id = newId();
+  const blueprint: StoredBlueprint = {
+    _id: id,
+    _creationTime: created,
+    siteId: state.site._id,
+    name: input.name,
+    kind: input.kind,
+    appliesTo: input.appliesTo,
+    contentTypeId: input.contentTypeId,
+    content: normalizeContent(
+      input.content ?? { blocks: defaultBlueprintTree(input.kind, input.appliesTo) },
+    ),
+    createdBy: actor(state),
+    updatedAt: created,
+  };
+  return { next: { ...state, blueprints: [blueprint, ...state.blueprints] }, id };
+}
+
+/**
+ * Update blueprint
+ */
+export function updateBlueprint(
+  state: HMSState,
+  id: string,
+  patch: Partial<Pick<StoredBlueprint, "name" | "content" | "appliesTo" | "contentTypeId">>,
+): HMSState {
+  return {
+    ...state,
+    blueprints: state.blueprints.map((item) =>
+      item._id === id
+        ? {
+            ...item,
+            ...patch,
+            content: patch.content ? normalizeContent(patch.content) : item.content,
+            updatedAt: now(),
+          }
+        : item,
+    ),
+  };
+}
+
+/**
+ * Remove blueprint
+ */
+export function removeBlueprint(state: HMSState, id: string): HMSState {
+  return { ...state, blueprints: state.blueprints.filter((item) => item._id !== id) };
+}
+
+/**
+ * Add content type
+ */
+export function addContentType(
+  state: HMSState,
+  input: { name: string; slug?: string; plural?: string; fields?: ContentField[] },
+): { next: HMSState; id: string } {
+  const slug = normalizeSlug(input.slug ?? input.name);
+  if (state.contentTypes.some((item) => item.slug === slug)) {
+    throw new Error(`Slug "${slug}" is already in use`);
+  }
+  const created = now();
+  const id = newId();
+  const type: StoredContentType = {
+    _id: id,
+    _creationTime: created,
+    siteId: state.site._id,
+    name: input.name,
+    slug,
+    plural: input.plural ?? `${input.name}s`,
+    fields: input.fields ?? [],
+    createdBy: actor(state),
+    updatedAt: created,
+  };
+  return { next: { ...state, contentTypes: [type, ...state.contentTypes] }, id };
+}
+
+/**
+ * Update content type
+ */
+export function updateContentType(
+  state: HMSState,
+  id: string,
+  patch: Partial<Pick<StoredContentType, "name" | "slug" | "plural" | "fields">>,
+): HMSState {
+  const existing = state.contentTypes.find((item) => item._id === id);
+  if (!existing) throw new Error("Content type not found");
+  const slug = patch.slug ? normalizeSlug(patch.slug) : existing.slug;
+  if (state.contentTypes.some((item) => item.slug === slug && item._id !== id)) {
+    throw new Error(`Slug "${slug}" is already in use`);
+  }
+  return {
+    ...state,
+    contentTypes: state.contentTypes.map((item) =>
+      item._id === id ? { ...item, ...patch, slug, updatedAt: now() } : item,
+    ),
+  };
+}
+
+/**
+ * Remove content type
+ */
+export function removeContentType(state: HMSState, id: string): HMSState {
+  return {
+    ...state,
+    contentTypes: state.contentTypes.filter((item) => item._id !== id),
+    entries: state.entries.filter((entry) => entry.contentTypeId !== id),
+    blueprints: state.blueprints.filter((item) => item.contentTypeId !== id),
+  };
+}
+
+/**
+ * Add entry
+ */
+export function addEntry(
+  state: HMSState,
+  input: {
+    contentTypeId: string;
+    title: string;
+    slug?: string;
+    status?: StoredEntry["status"];
+    fields?: Record<string, string>;
+    content?: PageContent;
+  },
+): { next: HMSState; id: string } {
+  const type = state.contentTypes.find((item) => item._id === input.contentTypeId);
+  if (!type) throw new Error("Content type not found");
+  const slug = normalizeSlug(input.slug ?? input.title);
+  if (
+    state.entries.some((item) => item.contentTypeId === input.contentTypeId && item.slug === slug)
+  ) {
+    throw new Error(`Slug "${slug}" is already in use`);
+  }
+  const created = now();
+  const id = newId();
+  const entry: StoredEntry = {
+    _id: id,
+    _creationTime: created,
+    siteId: state.site._id,
+    contentTypeId: input.contentTypeId,
+    title: input.title,
+    slug,
+    status: input.status ?? "draft",
+    fields: input.fields ?? {},
+    content: normalizeContent(input.content ?? { blocks: [] }),
+    createdBy: actor(state),
+    updatedAt: created,
+  };
+  return { next: { ...state, entries: [entry, ...state.entries] }, id };
+}
+
+/**
+ * Update entry
+ */
+export function updateEntry(
+  state: HMSState,
+  id: string,
+  patch: Partial<Pick<StoredEntry, "title" | "slug" | "status" | "fields" | "content">>,
+): HMSState {
+  const existing = state.entries.find((item) => item._id === id);
+  if (!existing) throw new Error("Entry not found");
+  const slug = patch.slug ? normalizeSlug(patch.slug) : existing.slug;
+  if (
+    state.entries.some(
+      (item) =>
+        item.contentTypeId === existing.contentTypeId && item.slug === slug && item._id !== id,
+    )
+  ) {
+    throw new Error(`Slug "${slug}" is already in use`);
+  }
+  return {
+    ...state,
+    entries: state.entries.map((item) =>
+      item._id === id
+        ? {
+            ...item,
+            ...patch,
+            slug,
+            content: patch.content ? normalizeContent(patch.content) : item.content,
+            updatedAt: now(),
+          }
+        : item,
+    ),
+  };
+}
+
+/**
+ * Remove entry
+ */
+export function removeEntry(state: HMSState, id: string): HMSState {
+  return { ...state, entries: state.entries.filter((item) => item._id !== id) };
+}
+
+/**
+ * Add submission
+ */
+export function addSubmission(
+  state: HMSState,
+  input: { formId: string; values: Record<string, string> },
+): { next: HMSState; id: string } {
+  const id = newId();
+  const submission: StoredSubmission = {
+    _id: id,
+    formId: input.formId,
+    values: input.values,
+    createdAt: now(),
+  };
+  return { next: { ...state, submissions: [submission, ...state.submissions] }, id };
+}
+
+function seedLibrary(state: HMSState): HMSState {
+  const contact = addBlueprint(state, { name: "Contact form", kind: "form" });
+  const card = addBlueprint(contact.next, { name: "Post card", kind: "loop-item" });
+  const archive = addBlueprint(card.next, {
+    name: "Blog archive",
+    kind: "template",
+    appliesTo: "post-archive",
+    content: {
+      blocks: defaultBlueprintTree("template", "post-archive").map((block) =>
+        block.type === "collection"
+          ? { ...block, content: { ...block.content, loopItemId: card.id } }
+          : block,
+      ),
+    },
+  });
+  const single = addBlueprint(archive.next, {
+    name: "Blog single",
+    kind: "template",
+    appliesTo: "post-single",
+  });
+  const type = addContentType(single.next, {
+    name: "Case study",
+    slug: "work",
+    plural: "Case studies",
+    fields: [
+      { id: "f-client", key: "client", label: "Client", type: "text" },
+      { id: "f-year", key: "year", label: "Year", type: "text" },
+      { id: "f-outcome", key: "outcome", label: "Outcome", type: "text" },
+      {
+        id: "f-sector",
+        key: "sector",
+        label: "Sector",
+        type: "terms",
+        options: ["saas", "agency", "retail"],
+      },
+    ],
+  });
+  const typeArchive = addBlueprint(type.next, {
+    name: "Case study archive",
+    kind: "template",
+    appliesTo: "entry-archive",
+    contentTypeId: type.id,
+    content: {
+      blocks: [
+        {
+          ...createBlock("heading"),
+          content: { title: "Case studies", level: 1 },
+        },
+        {
+          ...createBlock("collection"),
+          content: {
+            title: "",
+            source: "work",
+            layout: "grid",
+            limit: 12,
+            columns: 3,
+            loopItemId: card.id,
+            searchParam: "q",
+            facetField: "sector",
+            loadMore: true,
+          },
+        },
+      ],
+    },
+  });
+  const typeSingle = addBlueprint(typeArchive.next, {
+    name: "Case study single",
+    kind: "template",
+    appliesTo: "entry-single",
+    contentTypeId: type.id,
+  });
+  const entry = addEntry(typeSingle.next, {
+    contentTypeId: type.id,
+    title: "Replacing the brochure site",
+    slug: "brochure",
+    status: "published",
+    fields: {
+      client: "Northwind",
+      year: "2026",
+      outcome: "Shipped in a week. No plugins.",
+      sector: "saas",
+    },
+    content: {
+      blocks: [
+        {
+          ...createBlock("text"),
+          content: { body: "They needed a site they could edit without a developer on call." },
+        },
+      ],
+    },
+  });
+  return ensureThemeTemplates(entry.next);
+}
+
+const THEME_TEMPLATES: { name: string; appliesTo: TemplateSurface }[] = [
+  { name: "Site header", appliesTo: "header" },
+  { name: "Site footer", appliesTo: "footer" },
+  { name: "Not found", appliesTo: "404" },
+  { name: "Search", appliesTo: "search" },
+  { name: "Shop archive", appliesTo: "product-archive" },
+  { name: "Product single", appliesTo: "product-single" },
+];
+
+/**
+ * Ensure theme templates
+ * Adds missing header/footer/404/search/shop trees without touching existing ones.
+ */
+export function ensureThemeTemplates(state: HMSState): HMSState {
+  let next = hydrateCollections(state);
+  for (const item of THEME_TEMPLATES) {
+    if (next.blueprints.some((blueprint) => blueprint.appliesTo === item.appliesTo)) continue;
+    next = addBlueprint(next, {
+      name: item.name,
+      kind: "template",
+      appliesTo: item.appliesTo,
+    }).next;
+  }
+  return next;
+}
+
+/**
+ * Ensure library
+ * Older local saves have no blueprints. Attach the seed library without wiping pages.
+ */
+export function ensureLibrary(state: HMSState): HMSState {
+  const hydrated = hydrateCollections(state);
+  if ((hydrated.blueprints?.length ?? 0) === 0) return seedLibrary(hydrated);
+  return ensureThemeTemplates(hydrated);
+}
+
+function hydrateCollections(state: HMSState): HMSState {
+  return {
+    ...state,
+    blueprints: state.blueprints ?? [],
+    contentTypes: state.contentTypes ?? [],
+    entries: state.entries ?? [],
+    submissions: state.submissions ?? [],
+  };
+}
+
 export const STORAGE_KEY = "hms.v1";
 
 /**
@@ -679,7 +1102,7 @@ export function loadState(storage: Pick<Storage, "getItem">): HMSState {
   try {
     const parsed = JSON.parse(raw) as HMSState;
     if (!parsed?.site || !Array.isArray(parsed.pages)) return seedState();
-    return parsed;
+    return ensureLibrary(parsed);
   } catch {
     return seedState();
   }

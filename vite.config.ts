@@ -14,7 +14,17 @@ export default defineConfig({
         "warn",
         {
           allowConstantExport: true,
-          allowExportNames: ["useHMS", "useEditDoc", "useCollectionData", "useDebouncedBlocks"],
+          allowExportNames: [
+            "useHMS",
+            "useEditDoc",
+            "useCollectionData",
+            "useDebouncedBlocks",
+            "useDynamicContext",
+            "useSetDynamicDocument",
+            "useEditorRender",
+            "useDocumentBody",
+            "useCart",
+          ],
         },
       ],
       "vite-plus/prefer-vite-plus-imports": "error",

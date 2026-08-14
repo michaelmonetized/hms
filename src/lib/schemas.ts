@@ -110,6 +110,73 @@ export const RevisionSchema = z.object({
   createdAt: z.number(),
 });
 
+const ContentFieldBase = {
+  id: z.string(),
+  key: z.string(),
+  label: z.string(),
+  type: z.enum(["text", "rich", "image", "url", "number", "date", "relation", "repeater", "terms"]),
+  options: z.array(z.string()).optional(),
+  relationTypeId: z.string().optional(),
+};
+
+export const ContentFieldSchema = z.object({
+  ...ContentFieldBase,
+  repeaterFields: z.array(z.object(ContentFieldBase)).optional(),
+});
+
+export const BlueprintSchema = z.object({
+  siteId: z.string(),
+  name: z.string().min(1, "Name is required"),
+  kind: z.enum(["component", "form", "loop-item", "template"]),
+  appliesTo: z
+    .enum([
+      "page",
+      "post-single",
+      "post-archive",
+      "entry-single",
+      "entry-archive",
+      "header",
+      "footer",
+      "404",
+      "search",
+      "product-single",
+      "product-archive",
+    ])
+    .optional(),
+  contentTypeId: z.string().optional(),
+  content: z.any(),
+  createdBy: z.string(),
+  updatedAt: z.number(),
+});
+
+export const ContentTypeSchema = z.object({
+  siteId: z.string(),
+  name: z.string().min(1, "Name is required"),
+  slug: z.string().min(1, "Slug is required"),
+  plural: z.string(),
+  fields: z.array(ContentFieldSchema),
+  createdBy: z.string(),
+  updatedAt: z.number(),
+});
+
+export const EntrySchema = z.object({
+  siteId: z.string(),
+  contentTypeId: z.string(),
+  title: z.string().min(1, "Title is required"),
+  slug: z.string().min(1, "Slug is required"),
+  status: z.enum(["published", "draft"]),
+  fields: z.record(z.string(), z.string()),
+  content: z.any(),
+  createdBy: z.string(),
+  updatedAt: z.number(),
+});
+
+export const SubmissionSchema = z.object({
+  formId: z.string(),
+  values: z.record(z.string(), z.string()),
+  createdAt: z.number(),
+});
+
 export const VariantSchema = z.object({
   entityType: z.enum(["page", "post"]),
   entityId: z.string(),
@@ -129,3 +196,8 @@ export type Product = z.infer<typeof ProductSchema>;
 export type Media = z.infer<typeof MediaSchema>;
 export type Revision = z.infer<typeof RevisionSchema>;
 export type Variant = z.infer<typeof VariantSchema>;
+export type ContentFieldDef = z.infer<typeof ContentFieldSchema>;
+export type Blueprint = z.infer<typeof BlueprintSchema>;
+export type ContentType = z.infer<typeof ContentTypeSchema>;
+export type Entry = z.infer<typeof EntrySchema>;
+export type Submission = z.infer<typeof SubmissionSchema>;

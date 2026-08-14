@@ -58,6 +58,12 @@ describe("createBlock", () => {
     expect(block.children).toHaveLength(3);
     expect(block.children?.every((child) => child.type === "column")).toBe(true);
   });
+
+  test("builds a section with an empty child list", () => {
+    const block = createBlock("section");
+    expect(block.type).toBe("section");
+    expect(block.children).toEqual([]);
+  });
 });
 
 describe("block tree", () => {
@@ -100,6 +106,17 @@ describe("block tree", () => {
     const moved = moveBlockTree(inserted, image.id, second, 0);
     expect(moved[0].children?.[0].children).toEqual([]);
     expect(moved[0].children?.[1].children?.[0].id).toBe(image.id);
+  });
+
+  test("keeps style and visibility when content is normalized", () => {
+    const heading = createBlock("heading");
+    heading.style = { paddingTop: 12, background: "red" };
+    heading.visibility = { when: "logged-in" };
+    heading.locked = true;
+    const next = normalizeContent({ blocks: [heading] });
+    expect(next.blocks[0].style?.paddingTop).toBe(12);
+    expect(next.blocks[0].visibility?.when).toBe("logged-in");
+    expect(next.blocks[0].locked).toBe(true);
   });
 });
 

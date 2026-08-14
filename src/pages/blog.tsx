@@ -9,6 +9,27 @@ export default function Blog() {
   const hms = useHMS();
   const navigate = useNavigate();
 
+  const archive = hms.blueprints.find(
+    (item) => item.kind === "template" && item.appliesTo === "post-archive",
+  );
+  const single = hms.blueprints.find(
+    (item) => item.kind === "template" && item.appliesTo === "post-single",
+  );
+
+  const openTemplate = async (surface: "post-archive" | "post-single") => {
+    const existing = surface === "post-archive" ? archive : single;
+    if (existing) {
+      void navigate(`/manage/library/${existing._id}`);
+      return;
+    }
+    const id = await hms.createBlueprint({
+      name: surface === "post-archive" ? "Blog archive" : "Blog single",
+      kind: "template",
+      appliesTo: surface,
+    });
+    void navigate(`/manage/library/${id}`);
+  };
+
   const handleCreate = async () => {
     const slug = `post-${Date.now()}`;
     await hms.createPost({ title: "Untitled post", slug });
@@ -25,12 +46,22 @@ export default function Blog() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Blog</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Open a post to edit it live.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Posts use the live editor. Archive and single templates live in the library.
+          </p>
         </div>
-        <Button size="sm" onClick={() => void handleCreate()} className="gap-1.5">
-          <PlusIcon className="size-3.5" />
-          New Post
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => void openTemplate("post-archive")}>
+            Archive template
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void openTemplate("post-single")}>
+            Single template
+          </Button>
+          <Button size="sm" onClick={() => void handleCreate()} className="gap-1.5">
+            <PlusIcon className="size-3.5" />
+            New Post
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">

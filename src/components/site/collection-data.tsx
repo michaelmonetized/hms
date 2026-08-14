@@ -1,6 +1,15 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useHMS } from "@/hooks/use-hms";
-import type { StoredMedia, StoredPage, StoredPost, StoredProduct, StoredSite } from "@/lib/store";
+import type {
+  StoredBlueprint,
+  StoredContentType,
+  StoredEntry,
+  StoredMedia,
+  StoredPage,
+  StoredPost,
+  StoredProduct,
+  StoredSite,
+} from "@/lib/store";
 
 export type CollectionData = {
   site: StoredSite | null;
@@ -8,6 +17,9 @@ export type CollectionData = {
   posts: StoredPost[];
   products: StoredProduct[];
   media: StoredMedia[];
+  blueprints: StoredBlueprint[];
+  contentTypes: StoredContentType[];
+  entries: StoredEntry[];
 };
 
 const CollectionContext = createContext<CollectionData | null>(null);
@@ -22,6 +34,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         posts: hms.posts,
         products: hms.products,
         media: hms.media,
+        blueprints: hms.blueprints,
+        contentTypes: hms.contentTypes,
+        entries: hms.entries,
       }}
     >
       {children}
@@ -37,6 +52,9 @@ export function useCollectionData(): CollectionData {
       posts: [],
       products: [],
       media: [],
+      blueprints: [],
+      contentTypes: [],
+      entries: [],
     }
   );
 }

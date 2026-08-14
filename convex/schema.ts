@@ -9,6 +9,10 @@ import {
   MediaSchema,
   RevisionSchema,
   VariantSchema,
+  BlueprintSchema,
+  ContentTypeSchema,
+  EntrySchema,
+  SubmissionSchema,
 } from "../src/lib/schemas";
 
 export default defineSchema({
@@ -39,4 +43,17 @@ export default defineSchema({
     "entityType",
     "entityId",
   ]),
+
+  blueprints: defineTable(zodToConvexFields(BlueprintSchema.shape)).index("by_site", ["siteId"]),
+
+  contentTypes: defineTable(zodToConvexFields(ContentTypeSchema.shape))
+    .index("by_site", ["siteId"])
+    .index("by_slug", ["siteId", "slug"]),
+
+  entries: defineTable(zodToConvexFields(EntrySchema.shape))
+    .index("by_site", ["siteId"])
+    .index("by_type", ["contentTypeId"])
+    .index("by_slug", ["contentTypeId", "slug"]),
+
+  submissions: defineTable(zodToConvexFields(SubmissionSchema.shape)).index("by_form", ["formId"]),
 });

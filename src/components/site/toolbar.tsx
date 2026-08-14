@@ -88,6 +88,12 @@ export function AdminToolbar({
           <DropdownMenuContent align="end">
             <DropdownMenuItem render={<Link to={managePath("page")} />}>Pages</DropdownMenuItem>
             <DropdownMenuItem render={<Link to={managePath("post")} />}>Blog</DropdownMenuItem>
+            <DropdownMenuItem render={<Link to={managePath("library")} />}>
+              Library
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link to={managePath("types")} />}>
+              Content types
+            </DropdownMenuItem>
             <DropdownMenuItem render={<Link to={managePath("product")} />}>
               Products
             </DropdownMenuItem>

@@ -11,8 +11,14 @@ export const BLOCK_TYPES = [
   "video",
   "gallery",
   "video-gallery",
+  "html",
+  "form",
+  "field",
+  "component",
+  "document-content",
   "hero",
   "cta",
+  "section",
   "features",
   "columns",
   "column",
@@ -22,12 +28,56 @@ export const BLOCK_TYPES = [
   "pricing",
   "logos",
   "collection",
+  "menu",
+  "search",
+  "add-to-cart",
+  "cart",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
-export type CollectionSource = "pages" | "posts" | "products" | "media";
+export type CollectionSource = string;
 export type CollectionLayout = "grid" | "table" | "carousel" | "gallery" | "list";
+export type Breakpoint = "desktop" | "tablet" | "mobile";
+export type VisibilityWhen = "always" | "logged-in" | "logged-out" | "query" | "never";
+export type CompareOp =
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "contains"
+  | "empty"
+  | "not-empty";
+export type VisibilityOp =
+  | "always"
+  | "never"
+  | "logged-in"
+  | "logged-out"
+  | "role"
+  | "query"
+  | "referrer"
+  | "cookie"
+  | "schedule"
+  | "field"
+  | "device";
+export type CollectionSort =
+  | "date-desc"
+  | "date-asc"
+  | "title-asc"
+  | "title-desc"
+  | "field-asc"
+  | "field-desc";
+export type FormActionType = "none" | "email" | "create-entry" | "redirect";
+export type FormFieldType =
+  | "text"
+  | "email"
+  | "textarea"
+  | "select"
+  | "checkbox"
+  | "number"
+  | "url";
 
 export type BlockContent = {
   title?: string;
@@ -45,20 +95,117 @@ export type BlockContent = {
   level?: 1 | 2 | 3;
   align?: "left" | "center" | "right";
   background?: string;
+  fieldType?: FormFieldType;
+  required?: boolean;
+  placeholder?: string;
+  blueprintId?: string;
+  loopItemId?: string;
+  sort?: CollectionSort;
+  sortField?: string;
+  filterField?: string;
+  filterCompare?: CompareOp;
+  filterValue?: string;
+  excludeCurrent?: boolean;
+  relatedField?: string;
+  offset?: number;
+  paginate?: boolean;
+  searchParam?: string;
+  emptyTitle?: string;
+  emptyBody?: string;
+  loadMore?: boolean;
+  facetField?: string;
+  formAction?: FormActionType;
+  formTarget?: string;
+  formRedirect?: string;
+  showWhenField?: string;
+  showWhenValue?: string;
 };
+
+export type BlockStyle = {
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  marginTop?: number;
+  marginBottom?: number;
+  background?: string;
+  color?: string;
+  maxWidth?: number;
+  align?: "left" | "center" | "right";
+  fontSize?: number;
+};
+
+export type VisibilityCondition = {
+  op: VisibilityOp;
+  key?: string;
+  value?: string;
+  compare?: CompareOp;
+  from?: string;
+  to?: string;
+};
+
+export type VisibilityRule = {
+  when?: VisibilityWhen;
+  queryKey?: string;
+  queryValue?: string;
+  hideOn?: Breakpoint[];
+  match?: "all" | "any";
+  conditions?: VisibilityCondition[];
+  fallback?: string;
+};
+
+export type DynamicBindings = Partial<Record<string, string>>;
 
 export type Block = {
   id: string;
   type: BlockType;
   content: BlockContent;
   children?: Block[];
+  style?: BlockStyle;
+  visibility?: VisibilityRule;
+  bindings?: DynamicBindings;
+  htmlId?: string;
+  cssClass?: string;
+  hidden?: boolean;
+  locked?: boolean;
 };
+
+export type BlockLocation = {
+  block: Block;
+  parentId: string | null;
+  index: number;
+};
+
+export type FlatNode = {
+  id: string;
+  type: BlockType;
+  parentId: string | null;
+  index: number;
+  depth: number;
+  label: string;
+  hidden?: boolean;
+  locked?: boolean;
+  childCount: number;
+};
+
+export const CONTAINER_TYPES: ReadonlySet<BlockType> = new Set(["section", "column", "form"]);
+
+export type BuilderMode = "page" | "form" | "component" | "loop-item" | "template";
 
 export type PageContent = {
   blocks: Block[];
 };
 
-export const RESERVED_SLUGS = new Set(["blog", "shop", "sign-in", "manage", "media", "settings"]);
+export const RESERVED_SLUGS = new Set([
+  "blog",
+  "shop",
+  "sign-in",
+  "manage",
+  "media",
+  "settings",
+  "search",
+  "cart",
+]);
 
 const DEFAULTS: Record<BlockType, BlockContent> = {
   heading: { title: "Section heading", level: 2 },
@@ -77,6 +224,15 @@ const DEFAULTS: Record<BlockType, BlockContent> = {
     urls: [],
   },
   "video-gallery": { title: "Videos", urls: [] },
+  html: { body: "<p>Custom HTML. Tokens like {{site.name}} work here.</p>" },
+  form: {
+    title: "Get in touch",
+    subtitle: "We reply the same day.",
+    buttonText: "Send",
+  },
+  field: { title: "Name", fieldType: "text", placeholder: "", required: false },
+  component: { title: "Component", blueprintId: "" },
+  "document-content": { title: "Document body" },
   hero: {
     title: "Build systems that scale.",
     subtitle: "The site is the editor. Change it. Visitors see it.",
@@ -94,6 +250,7 @@ const DEFAULTS: Record<BlockType, BlockContent> = {
     title: "What you get",
     items: ["Live editing on the real page", "Drag-and-drop blocks", "Dynamic views of your data"],
   },
+  section: { title: "" },
   columns: { columns: 3 },
   column: {},
   stats: {
@@ -119,7 +276,12 @@ const DEFAULTS: Record<BlockType, BlockContent> = {
     layout: "grid",
     limit: 6,
     columns: 3,
+    loopItemId: "",
   },
+  menu: { title: "" },
+  search: { title: "Search", placeholder: "Search…" },
+  "add-to-cart": { buttonText: "Add to cart" },
+  cart: { title: "Cart" },
 };
 
 /**
@@ -187,7 +349,50 @@ export function createBlock(type: BlockType): Block {
       children: [],
     }));
   }
+  if (type === "section") {
+    block.children = [];
+  }
+  if (type === "form") {
+    block.children = [
+      fieldBlock("Name", "text"),
+      fieldBlock("Email", "email"),
+      fieldBlock("Message", "textarea"),
+    ];
+  }
   return block;
+}
+
+function fieldBlock(title: string, fieldType: FormFieldType): Block {
+  return {
+    id: newId(),
+    type: "field",
+    content: { title, fieldType, placeholder: "", required: fieldType !== "checkbox" },
+  };
+}
+
+function cloneStyle(style?: BlockStyle): BlockStyle | undefined {
+  return style ? { ...style } : undefined;
+}
+
+function cloneVisibility(rule?: VisibilityRule): VisibilityRule | undefined {
+  if (!rule) return undefined;
+  return { ...rule, hideOn: rule.hideOn?.slice() };
+}
+
+/**
+ * Clone block
+ * Deep-copies a block and assigns fresh ids to it and every descendant.
+ */
+export function cloneBlock(block: Block): Block {
+  return {
+    ...block,
+    id: newId(),
+    content: cloneContent(block.content),
+    style: cloneStyle(block.style),
+    visibility: cloneVisibility(block.visibility),
+    bindings: block.bindings ? { ...block.bindings } : undefined,
+    children: block.children?.map(cloneBlock),
+  };
 }
 
 function normalizeBlock(value: unknown): Block | null {
@@ -202,6 +407,13 @@ function normalizeBlock(value: unknown): Block | null {
     type: raw.type,
     content: raw.content && typeof raw.content === "object" ? raw.content : {},
     children,
+    style: raw.style && typeof raw.style === "object" ? raw.style : undefined,
+    visibility: raw.visibility && typeof raw.visibility === "object" ? raw.visibility : undefined,
+    bindings: raw.bindings && typeof raw.bindings === "object" ? raw.bindings : undefined,
+    htmlId: typeof raw.htmlId === "string" ? raw.htmlId : undefined,
+    cssClass: typeof raw.cssClass === "string" ? raw.cssClass : undefined,
+    hidden: raw.hidden === true ? true : undefined,
+    locked: raw.locked === true ? true : undefined,
   };
 }
 
@@ -244,6 +456,83 @@ export function findBlock(blocks: Block[], id: string): Block | null {
 }
 
 /**
+ * Locate block
+ * Returns the block plus its parent id and sibling index.
+ */
+export function locateBlock(
+  blocks: Block[],
+  id: string,
+  parentId: string | null = null,
+): BlockLocation | null {
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (block.id === id) return { block, parentId, index };
+    if (block.children) {
+      const nested = locateBlock(block.children, id, block.id);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+/**
+ * Find path
+ * Root-to-leaf ancestors of the matching block, including itself.
+ */
+export function findPath(blocks: Block[], id: string): Block[] {
+  for (const block of blocks) {
+    if (block.id === id) return [block];
+    if (block.children) {
+      const nested = findPath(block.children, id);
+      if (nested.length > 0) return [block, ...nested];
+    }
+  }
+  return [];
+}
+
+/**
+ * Block label
+ * Short label for navigator, breadcrumbs, and finder.
+ */
+export function blockLabel(block: Block): string {
+  const copy = block.content.title || block.content.buttonText || block.content.body;
+  if (copy) {
+    const clipped = copy.replace(/\s+/g, " ").trim().slice(0, 32);
+    if (clipped.length > 0) return clipped;
+  }
+  return block.type.replaceAll("-", " ");
+}
+
+/**
+ * Flatten tree
+ * Depth-first list used by the navigator and keyboard movement.
+ */
+export function flattenTree(
+  blocks: Block[],
+  parentId: string | null = null,
+  depth = 0,
+): FlatNode[] {
+  const nodes: FlatNode[] = [];
+  blocks.forEach((block, index) => {
+    nodes.push({
+      id: block.id,
+      type: block.type,
+      parentId,
+      index,
+      depth,
+      label: blockLabel(block),
+      hidden: block.hidden,
+      locked: block.locked,
+      childCount: block.children?.length ?? 0,
+    });
+    if (block.children) {
+      nodes.push(...flattenTree(block.children, block.id, depth + 1));
+    }
+  });
+  return nodes;
+}
+
+/**
  * Update block tree
  * Patches content on the matching block.
  */
@@ -258,6 +547,30 @@ export function updateBlockTree(
     }
     if (block.children) {
       return { ...block, children: updateBlockTree(block.children, id, patch) };
+    }
+    return block;
+  });
+}
+
+/**
+ * Patch block
+ * Merges any block fields except id. Content is shallow-merged.
+ */
+export function patchBlock(
+  blocks: Block[],
+  id: string,
+  patch: Partial<Omit<Block, "id">>,
+): Block[] {
+  return blocks.map((block) => {
+    if (block.id === id) {
+      return {
+        ...block,
+        ...patch,
+        content: patch.content ? { ...block.content, ...patch.content } : block.content,
+      };
+    }
+    if (block.children) {
+      return { ...block, children: patchBlock(block.children, id, patch) };
     }
     return block;
   });
@@ -402,21 +715,30 @@ export function formatBytes(size: number): string {
  * Public path
  * Visitor-facing URL. The site lives at the root.
  */
-export function publicPath(kind: "page" | "post" | "product", slug: string): string {
+export function publicPath(
+  kind: "page" | "post" | "product" | "entry",
+  slug: string,
+  typeSlug?: string,
+): string {
   const normalized = normalizeSlug(slug);
   if (kind === "page") return normalized === "home" ? "/" : `/${normalized}`;
   if (kind === "post") return `/blog/${normalized}`;
+  if (kind === "entry") return `/${normalizeSlug(typeSlug ?? "entries")}/${normalized}`;
   return `/shop/${normalized}`;
 }
 
 /**
  * Manage path
  */
-export function managePath(kind: "page" | "post" | "product" | "media" | "settings"): string {
+export function managePath(
+  kind: "page" | "post" | "product" | "media" | "settings" | "library" | "types",
+): string {
   if (kind === "page") return "/manage/pages";
   if (kind === "post") return "/manage/blog";
   if (kind === "product") return "/manage/products";
   if (kind === "media") return "/manage/media";
+  if (kind === "library") return "/manage/library";
+  if (kind === "types") return "/manage/types";
   return "/manage/settings";
 }
 
