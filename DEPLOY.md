@@ -3,7 +3,7 @@
 ## Live status (2026-09-08 night)
 - Vercel project **linked** to `michaelmonetized/hms` on team hustle-launch (`prj_afPjkvW2HBoF9gvlGjxnJG0nh0fE`).
 - Initial production deploy failed: pnpm 11 `ERR_PNPM_IGNORED_BUILDS` for `@clerk/shared` / `esbuild` (see `pnpm-workspace.yaml` `allowBuilds`).
-- Fix pushed: `allowBuilds` set true + `pnpm.onlyBuiltDependencies`. Redeploy should produce `https://hms.vercel.app` / `https://hms-hustle-launch.vercel.app`.
+- Fix pushed: `allowBuilds` set true + `pnpm.onlyBuiltDependencies`. Live: **https://hms-cyan-six.vercel.app** (production alias; `hms.vercel.app` was unavailable). Team alias `hms-hustle-launch.vercel.app` may require Vercel auth.
 
 ## How to ship
 1. Push to `main` (Git integration auto-deploys).
